@@ -3,7 +3,7 @@ from scipy import *
 import numpy as np
 import keras
 from keras.models import Sequential,Model
-from keras.layers import Input,Embedding,Dense,Dropout,Activation,Add,concatenate
+from keras.layers import Input,Dense,Dropout,Activation,Add,Concatenate,Flatten
 from keras import optimizers
 from sklearn.utils import class_weight,compute_class_weight,shuffle
 from keras.activations import relu
@@ -11,6 +11,9 @@ from keras import regularizers
 from keras.callbacks import EarlyStopping,Callback
 import random
 from sklearn.metrics import roc_auc_score
+from keras.preprocessing.sequence import pad_sequences
+from keras.preprocessing.text import one_hot
+from keras.layers.embeddings import Embedding
 
 batch_size = 102400
 data_size = 10000000
@@ -40,24 +43,26 @@ def read_train_data(f,batch_size):
 		one_row_data_arr = one_row_data.split()
 		y.append(one_row_data_arr[0])
 		z.append(one_row_data_arr[1])
-		feature_list=[]
+		feature_list=''
 		for j in range(2,len(one_row_data_arr)):
 			a = one_row_data_arr[j].split(":")
-			feature_id = int(a[0])
-			feature_list.append(feature_id)
-		x.append(feature_list)		
+			feature_id = (a[0])
+			feature_list = feature_list+feature_id+' '
+		x.append(feature_list)
 	x,z,y = manual_shuffle(x,z,y)
-	sm = to_sparse(x,z)
+	#sm = to_sparse(x,z)
+	encoded_x = [one_hot(d,100000) for d in x]
+	padded_x = pad_sequences(encoded_x,maxlen=40,padding='post')
 	y_ca = keras.utils.to_categorical(y,2)
 	#global cw
 	#cw = compute_weight(y_ca)
-	return sm,y_ca
+	return padded_x,y_ca
 
 def read_test_data():
 	y_test = []
 	z_test = []
 	x_test = []
-	with open('/home/joseph/文件/all_data_before_prune/test_label_0.txt') as ff:
+	with open('/home/joseph/文件/prune_data/test_out100_0.txt') as ff:
 		#due to unbalanced label of click, we want more label "1"! select them out!
 		for i in range(50000):
 			one_row_data = ff.readline()
@@ -65,28 +70,34 @@ def read_test_data():
 			one_row_data_arr = one_row_data.split()
 			y_test.append(one_row_data_arr[0])
 			z_test.append(one_row_data_arr[1])
-			feature_list=[]
+			feature_list=''
 			for j in range(2,len(one_row_data_arr)):
 				a = one_row_data_arr[j].split(":")
-				feature_id = int(a[0])
-				feature_list.append(feature_id)
+				feature_id = (a[0])
+				feature_list = feature_list+feature_id+' '
 			x_test.append(feature_list)
 		#Then read another half of data, most of them are "0"!
-	with open('/home/joseph/文件/all_data_before_prune/test_label_1.txt') as ff:
+	with open('/home/joseph/文件/prune_data/test_out100_1.txt') as ff:
 		for k in range(50000):
 			one_row_data = ff.readline()
 			one_row_data_arr = one_row_data.split()
 			y_test.append(one_row_data_arr[0])
 			z_test.append(one_row_data_arr[1])
-			feature_list=[]
+			feature_list=''
 			for j in range(2,len(one_row_data_arr)):
 				a = one_row_data_arr[j].split(":")
-				feature_id = int(a[0])
-				feature_list.append(feature_id)
+				feature_id = (a[0])
+				feature_list = feature_list+feature_id+' '
 			x_test.append(feature_list)
-	sm_test = to_sparse(x_test,z_test)
+	#print(x_test[0])
+	encoded_x_test = [one_hot(d,100000) for d in x_test]
+	padded_x_test = pad_sequences(encoded_x_test,maxlen=40,padding='post')
+	#for e in x_test:
+	#	encoded_x = [one_hot(d,2000000)for d in e]
+	#	encoded_x_test.append(encoded_x)
+	#sm_test = to_sparse(x_test,z_test)
 	y_test_ca = keras.utils.to_categorical(y_test,2)
-	return sm_test,y_test_ca,y_test
+	return padded_x_test,y_test_ca,y_test
 
 def to_sparse(f_id,z_label):
 	row=[]
@@ -106,9 +117,11 @@ def to_sparse(f_id,z_label):
 	return sparse_matrix
 
 def get_model():
-	input1 = Input(batch_shape =(None,2000000),sparse = True)
-	#hidden = Dense(32,activation='relu')(input1)
-	out = Dense(2,activation = 'softmax',kernel_initializer='zeros')(input1)#,W_regularizer=regularizers.l2(0.002)
+	input1 = Input(batch_shape =(None,40),sparse = False)
+	embedded_layer = Embedding(input_dim=100000,output_dim=100,input_length=40)(input1)
+	flatten_layer = Flatten()(embedded_layer)
+	hidden = Dense(32,activation='relu')(flatten_layer)
+	out = Dense(2,activation = 'softmax',kernel_initializer='random_uniform')(hidden)#,W_regularizer=regularizers.l2(0.002)
 	model = Model(inputs=input1, outputs = out)
 	adam = keras.optimizers.Adam(lr=0.00001,beta_1=0.9,beta_2=0.999,epsilon=1e-08, decay=0.0)
 	model.compile(loss = 'categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
@@ -118,14 +131,14 @@ def get_model():
 def mygenerator(batch_size,data_size):
 	accumulation=0
 	while True:
-		with open('/home/joseph/文件/all_data_before_prune/train.yzx.txt') as f:
+		with open('/home/joseph/文件/prune_data/train_out100.txt') as f:
 			if((accumulation+batch_size)<data_size):
-				sm,y_ca=read_train_data(f,batch_size)
+				padded_x,y_ca=read_train_data(f,batch_size)
 				accumulation += batch_size
 			else:
-				sm,y_ca=read_train_data(f,data_size-accumulation)
+				padded_x,y_ca=read_train_data(f,data_size-accumulation)
 				accumulation = 0
-			yield sm,y_ca
+			yield padded_x,y_ca
 
 class roc_callback(Callback):
 	def __init__(self,testing_data):
@@ -167,13 +180,13 @@ def compute_weight(data_size):
 	return d_class_weights
 
 if __name__ == "__main__":
-	sm_test,y_test_ca,y_test = read_test_data()
+	padded_x_test,y_test_ca,y_test = read_test_data()
 	model = get_model()
 	early_stopping = EarlyStopping(monitor='val_loss', patience=0, verbose=1, mode='auto')
 	cw = compute_weight(data_size)
-	history = model.fit_generator(mygenerator(batch_size,data_size),steps_per_epoch=int(data_size/batch_size)+1,epochs=1000,verbose=1,validation_data=(sm_test,y_test_ca),class_weight=cw,callbacks=[roc_callback(testing_data=(sm_test,y_test_ca)),early_stopping],shuffle=True)
+	history = model.fit_generator(mygenerator(batch_size,data_size),steps_per_epoch=int(data_size/batch_size)+1,epochs=1000,verbose=1,validation_data=(padded_x_test,y_test_ca),class_weight=cw,callbacks=[roc_callback(testing_data=(padded_x_test,y_test_ca)),early_stopping])
 	print(cw)
-	ynew = model.predict(sm_test)
+	ynew = model.predict(padded_x_test)
 	tp=0
 	tn=0
 	fp=0
