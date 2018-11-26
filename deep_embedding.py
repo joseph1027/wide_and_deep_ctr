@@ -15,6 +15,21 @@ from sklearn.metrics import roc_auc_score
 batch_size = 102400
 data_size = 10000000
 
+def manual_shuffle(x,z,y):
+	total_len = len(y)
+	for i in range(total_len):
+		idx = random.randint(0,total_len-1)
+		tmp_x = x[i]
+		tmp_y = y[i]
+		tmp_z = z[i]
+		x[i] = x[idx]
+		y[i] = y[idx]
+		z[i] = z[idx]
+		x[idx] = tmp_x
+		y[idx] = tmp_y
+		z[idx] = tmp_z
+	return x,z,y
+
 def read_train_data(f,batch_size):
 	x=[]
 	y=[]
@@ -30,7 +45,8 @@ def read_train_data(f,batch_size):
 			a = one_row_data_arr[j].split(":")
 			feature_id = int(a[0])
 			feature_list.append(feature_id)
-		x.append(feature_list)
+		x.append(feature_list)		
+	x,z,y = manual_shuffle(x,z,y)
 	sm = to_sparse(x,z)
 	y_ca = keras.utils.to_categorical(y,2)
 	#global cw
@@ -112,31 +128,31 @@ def mygenerator(batch_size,data_size):
 			yield sm,y_ca
 
 class roc_callback(Callback):
-    def __init__(self,testing_data):
-        self.x_val = testing_data[0]
-        self.y_val = testing_data[1]
+	def __init__(self,testing_data):
+		self.x_val = testing_data[0]
+		self.y_val = testing_data[1]
 
-    def on_train_begin(self, logs={}):
-        return
+	def on_train_begin(self, logs={}):
+		return
 
-    def on_train_end(self, logs={}):
-        return
+	def on_train_end(self, logs={}):
+		return
 
-    def on_epoch_begin(self, epoch, logs={}):
-        return
+	def on_epoch_begin(self, epoch, logs={}):
+		return
 
-    def on_epoch_end(self, epoch, logs={}):
-        y_pred_val = self.model.predict(self.x_val)
-        #print(y_pred_val)
-        roc_val = roc_auc_score(self.y_val, y_pred_val)
-        print(('roc-auc_val:'+str(round(roc_val,4))),end=100*' '+'\n')
-        return
+	def on_epoch_end(self, epoch, logs={}):
+		y_pred_val = self.model.predict(self.x_val)
+		#print(y_pred_val)
+		roc_val = roc_auc_score(self.y_val, y_pred_val)
+		print(('roc-auc_val:'+str(round(roc_val,4))),end=100*' '+'\n')
+		return
 
-    def on_batch_begin(self, batch, logs={}):
-        return
+	def on_batch_begin(self, batch, logs={}):
+		return
 
-    def on_batch_end(self, batch, logs={}):
-        return
+	def on_batch_end(self, batch, logs={}):
+		return
 
 def compute_weight(data_size):
 	yy = []
