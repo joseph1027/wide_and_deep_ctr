@@ -193,7 +193,7 @@ def compute_weight(data_size):
 if __name__ == "__main__":
 	padded_x_test,y_test_ca,y_test = read_test_data()
 	model = get_model()
-	early_stopping = EarlyStopping(monitor='val_loss', patience=0, verbose=1, mode='auto')
+	early_stopping = EarlyStopping(monitor='val_loss', patience=1, verbose=1, mode='auto')
 	cw = compute_weight(data_size)
 	history = model.fit_generator(mygenerator(batch_size,data_size),steps_per_epoch=int(data_size/batch_size)+1,epochs=1000,verbose=1,validation_data=(padded_x_test,y_test_ca),class_weight=cw,callbacks=[roc_callback(testing_data=(padded_x_test,y_test_ca)),early_stopping])
 	print(cw)
