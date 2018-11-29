@@ -129,12 +129,14 @@ def to_sparse(f_id,z_label):
 
 def get_model():
 	input1 = Input(batch_shape =(None,40),sparse = False)
-	embedded_layer = Embedding(input_dim=2000000,output_dim=100,input_length=40,mask_zero=False)(input1)
+	embedded_layer = Embedding(input_dim=2000000,output_dim=6,input_length=40,mask_zero=False)(input1)
 	flatten_layer = Flatten()(embedded_layer)
-	hidden = Dense(32,activation='relu')(flatten_layer)
-	out = Dense(2,activation = 'softmax',kernel_initializer='random_uniform')(hidden)#,W_regularizer=regularizers.l2(0.002)
+	hidden = Dense(64,activation='relu')(flatten_layer)
+	hidden1 = Dense(32,activation='relu')(hidden)
+	hidden2 = Dense(16,activation='relu')(hidden1)
+	out = Dense(2,activation = 'softmax',kernel_initializer='uniform')(hidden2)#,W_regularizer=regularizers.l2(0.002)
 	model = Model(inputs=input1, outputs = out)
-	adam = keras.optimizers.Adam(lr=0.00001,beta_1=0.9,beta_2=0.999,epsilon=1e-08, decay=0.0)
+	adam = keras.optimizers.Adam(lr=0.000005,beta_1=0.9,beta_2=0.999,epsilon=1e-08, decay=0.0)
 	model.compile(loss = 'categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
 	model.summary()
 	return model
@@ -180,7 +182,7 @@ class roc_callback(Callback):
 
 def compute_weight(data_size):
 	yy = []
-	with open('/home/joseph/文件/all_data_before_prune/train.yzx.txt') as t:
+	with open('/home/joseph/文件/prune_data/train_out100.txt') as t:
 		for i in range(data_size):
 			line_data = t.readline().split()
 			yy.append(line_data[0])
